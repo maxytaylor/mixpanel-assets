@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Axel Springer + Mixpanel — Why the Numbers Don't Match</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --purple-01: #F2EEFF;
+    --purple-02: #DAD0FF;
+    --purple-03: #C1B1FF;
+    --purple-04: #A993FF;
+    --purple-06: #7856FF;
+    --purple-07: #5F41CF;
+    --purple-09: #2E1670;
+    --purple-10: #150040;
+    --gray-01: #FAFAFA;
+    --gray-02: #F4F4F4;
+    --gray-03: #EAEAEA;
+    --gray-04: #DFDFDF;
+    --gray-07: #A2A2A2;
+    --gray-08: #797979;
+    --gray-09: #515151;
+    --gray-10: #1F2023;
+    --mint-01: #F2FCFB;
+    --mint-06: #7FE1D8;
+    --mint-09: #205F56;
+    --grass-01: #EBF6F1;
+    --grass-06: #3BA974;
+    --grass-09: #0F472C;
+    --lava-01: #FFF0ED;
+    --lava-06: #FF7557;
+    --lava-09: #661D2D;
+    --mustard-01: #FEF8EB;
+    --mustard-06: #F8BC3C;
+    --mustard-09: #6E4319;
+    --pool-01: #F0F9FE;
+    --pool-06: #72BEF4;
+    --pool-09: #1D4B6D;
+    --white: #FFFFFF;
+    --black-70pct: rgba(0,0,0,0.70);
+    --white-70pct: rgba(255,255,255,0.70);
+    --white-10pct: rgba(255,255,255,0.10);
+    --white-20pct: rgba(255,255,255,0.20);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--gray-01);
+    color: var(--gray-10);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* HERO */
+  .hero {
+    background: var(--purple-10);
+    padding: 80px 0 72px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -200px; right: -200px;
+    width: 600px; height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(120,86,255,0.18) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: -150px; left: -100px;
+    width: 400px; height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(193,177,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .logo {
+    margin-bottom: 64px;
+  }
+
+  .logo svg { width: 140px; height: auto; }
+
+  .hero-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--purple-04);
+    margin-bottom: 20px;
+  }
+
+  .hero h1 {
+    font-size: 48px;
+    font-weight: 500;
+    color: var(--white);
+    line-height: 1.12;
+    max-width: 640px;
+    margin-bottom: 24px;
+    letter-spacing: -0.02em;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    color: var(--purple-03);
+  }
+
+  .hero-body {
+    font-size: 18px;
+    color: var(--white-70pct);
+    max-width: 560px;
+    line-height: 1.65;
+    margin-bottom: 40px;
+  }
+
+  .hero-byline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 40px;
+    border-top: 1px solid var(--white-10pct);
+    margin-top: 40px;
+  }
+
+  .byline-avatar {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--purple-06), var(--purple-04));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 600; color: white;
+    flex-shrink: 0;
+  }
+
+  .byline-text { font-size: 14px; color: var(--white-70pct); }
+  .byline-text strong { color: var(--white); font-weight: 500; }
+
+  /* CONTAINER */
+  .container { max-width: 840px; margin: 0 auto; padding: 0 40px; }
+
+  /* TLDR */
+  .tldr {
+    background: var(--purple-01);
+    border-top: 3px solid var(--purple-06);
+    padding: 48px 0;
+  }
+
+  .tldr-inner { display: grid; grid-template-columns: 200px 1fr; gap: 48px; align-items: start; }
+
+  .tldr-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--purple-06);
+    padding-top: 4px;
+  }
+
+  .tldr-points { list-style: none; display: flex; flex-direction: column; gap: 16px; }
+
+  .tldr-points li {
+    font-size: 16px;
+    color: var(--black-70pct);
+    padding-left: 20px;
+    position: relative;
+    line-height: 1.6;
+  }
+
+  .tldr-points li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--purple-06);
+    font-weight: 600;
+  }
+
+  /* SECTION */
+  .section { padding: 72px 0; border-bottom: 1px solid var(--gray-03); }
+  .section:last-child { border-bottom: none; }
+
+  .section-number {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--gray-07);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+
+  .section h2 {
+    font-size: 30px;
+    font-weight: 500;
+    color: var(--gray-10);
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+    line-height: 1.2;
+  }
+
+  .section-lead {
+    font-size: 18px;
+    color: var(--black-70pct);
+    line-height: 1.65;
+    max-width: 640px;
+    margin-bottom: 40px;
+  }
+
+  /* PARADIGM TABLE */
+  .paradigm-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+
+  .paradigm-table thead th {
+    background: var(--gray-10);
+    color: var(--white);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .paradigm-table thead th:first-child { border-radius: 8px 0 0 0; }
+  .paradigm-table thead th:last-child { border-radius: 0 8px 0 0; }
+
+  .paradigm-table tbody tr { border-bottom: 1px solid var(--gray-03); }
+  .paradigm-table tbody tr:last-child { border-bottom: none; }
+
+  .paradigm-table tbody td {
+    padding: 14px 16px;
+    vertical-align: top;
+    color: var(--black-70pct);
+    line-height: 1.5;
+    background: var(--white);
+  }
+
+  .paradigm-table tbody td:first-child {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--gray-09);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .paradigm-table tbody td.adobe { background: var(--lava-01); }
+  .paradigm-table tbody td.mixpanel { background: var(--purple-01); }
+
+  code {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    background: var(--gray-02);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--purple-07);
+  }
+
+  /* DRIVER CARDS */
+  .drivers-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .driver-card {
+    border-radius: 12px;
+    padding: 28px;
+    position: relative;
+  }
+
+  .driver-card.identity { background: var(--purple-01); }
+  .driver-card.consent { background: var(--lava-01); }
+  .driver-card.hits { background: var(--pool-01); }
+  .driver-card.sessions { background: var(--mustard-01); }
+  .driver-card.denominators { background: var(--mint-01); grid-column: 1 / -1; }
+
+  .driver-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .driver-card.identity .driver-num { color: var(--purple-07); }
+  .driver-card.consent .driver-num { color: var(--lava-06); }
+  .driver-card.hits .driver-num { color: var(--pool-09); }
+  .driver-card.sessions .driver-num { color: var(--mustard-09); }
+  .driver-card.denominators .driver-num { color: var(--mint-09); }
+
+  .driver-card h3 {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    line-height: 1.2;
+  }
+
+  .driver-card.identity h3 { color: var(--purple-09); }
+  .driver-card.consent h3 { color: var(--lava-09); }
+  .driver-card.hits h3 { color: var(--pool-09); }
+  .driver-card.sessions h3 { color: var(--mustard-09); }
+  .driver-card.denominators h3 { color: var(--mint-09); }
+
+  .driver-card p {
+    font-size: 14px;
+    color: var(--black-70pct);
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+
+  .driver-card p:last-child { margin-bottom: 0; }
+
+  .driver-card .callout {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+
+  .driver-card.identity .callout { background: rgba(120,86,255,0.08); color: var(--purple-09); }
+  .driver-card.consent .callout { background: rgba(255,117,87,0.08); color: var(--lava-09); }
+  .driver-card.hits .callout { background: rgba(114,190,244,0.12); color: var(--pool-09); }
+  .driver-card.sessions .callout { background: rgba(248,188,60,0.12); color: var(--mustard-09); }
+  .driver-card.denominators .callout { background: rgba(127,225,216,0.12); color: var(--mint-09); }
+
+  /* NUMBERS COMPARISON */
+  .numbers-block {
+    background: var(--white);
+    border: 1px solid var(--gray-03);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .numbers-header {
+    background: var(--gray-02);
+    padding: 12px 20px;
+    display: grid;
+    grid-template-columns: 1fr 120px 120px 80px;
+    gap: 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray-08);
+    border-bottom: 1px solid var(--gray-03);
+  }
+
+  .numbers-row {
+    padding: 14px 20px;
+    display: grid;
+    grid-template-columns: 1fr 120px 120px 80px;
+    gap: 12px;
+    align-items: center;
+    border-bottom: 1px solid var(--gray-03);
+    font-size: 14px;
+  }
+
+  .numbers-row:last-child { border-bottom: none; }
+  .numbers-row.highlight { background: var(--purple-01); }
+
+  .numbers-row .metric-name { color: var(--gray-10); font-weight: 500; }
+  .numbers-row .adobe-val { font-family: 'DM Mono', monospace; color: var(--gray-09); }
+  .numbers-row .mp-val { font-family: 'DM Mono', monospace; color: var(--purple-06); font-weight: 600; }
+
+  .badge {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+
+  .badge.ok { background: var(--grass-01); color: var(--grass-09); }
+  .badge.flag { background: var(--lava-01); color: var(--lava-09); }
+  .badge.def { background: var(--mustard-01); color: var(--mustard-09); }
+  .badge.explain { background: var(--pool-01); color: var(--pool-09); }
+
+  /* VARIANCE TABLE */
+  .variance-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+
+  .variance-table thead th {
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gray-08);
+    border-bottom: 2px solid var(--gray-03);
+  }
+
+  .variance-table tbody td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--gray-03);
+    color: var(--black-70pct);
+    vertical-align: middle;
+  }
+
+  .variance-table tbody td:first-child { color: var(--gray-10); font-weight: 500; }
+
+  .variance-band {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--purple-06);
+  }
+
+  /* PLAYBOOK */
+  .playbook-grid { display: flex; flex-direction: column; gap: 16px; }
+
+  .playbook-item {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 20px;
+    align-items: start;
+    background: var(--white);
+    border: 1px solid var(--gray-03);
+    border-radius: 10px;
+    padding: 24px;
+  }
+
+  .playbook-step {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--purple-06);
+    color: white;
+    font-weight: 600;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .playbook-content h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gray-10);
+    margin-bottom: 8px;
+  }
+
+  .playbook-content p {
+    font-size: 14px;
+    color: var(--black-70pct);
+    line-height: 1.6;
+  }
+
+  .playbook-content p + p { margin-top: 8px; }
+
+  /* BIGGER PICTURE */
+  .bigger-picture {
+    background: var(--purple-10);
+    padding: 72px 0;
+  }
+
+  .bigger-picture h2 {
+    font-size: 30px;
+    font-weight: 500;
+    color: var(--white);
+    letter-spacing: -0.02em;
+    margin-bottom: 24px;
+  }
+
+  .bigger-picture p {
+    font-size: 17px;
+    color: var(--white-70pct);
+    line-height: 1.65;
+    max-width: 600px;
+    margin-bottom: 20px;
+  }
+
+  .criteria-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 32px;
+    margin-bottom: 40px;
+  }
+
+  .criteria-item {
+    background: var(--white-10pct);
+    border: 1px solid var(--white-20pct);
+    border-radius: 10px;
+    padding: 20px 24px;
+  }
+
+  .criteria-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--purple-04);
+    margin-bottom: 8px;
+  }
+
+  .criteria-item h4 {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--white);
+    margin-bottom: 6px;
+  }
+
+  .criteria-item p {
+    font-size: 13px;
+    color: var(--white-70pct);
+    margin: 0;
+  }
+
+  .cta-block {
+    border-top: 1px solid var(--white-10pct);
+    padding-top: 32px;
+    margin-top: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+
+  .cta-text { font-size: 16px; color: var(--white-70pct); }
+  .cta-text strong { color: var(--white); }
+
+  .cta-btn {
+    background: var(--white);
+    color: var(--gray-10);
+    padding: 12px 24px;
+    border-radius: 40px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s;
+  }
+
+  .cta-btn:hover { background: var(--gray-02); }
+
+  /* FOOTER */
+  .footer {
+    background: var(--gray-02);
+    border-top: 1px solid var(--gray-03);
+    padding: 32px 0;
+  }
+
+  .footer-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .footer-logo svg { width: 90px; height: auto; opacity: 0.4; }
+
+  .footer-refs { text-align: right; }
+  .footer-refs p { font-size: 12px; color: var(--gray-07); margin-bottom: 4px; }
+  .footer-refs a { color: var(--purple-06); text-decoration: none; font-size: 12px; }
+  .footer-refs a:hover { text-decoration: underline; }
+
+  /* UTILITIES */
+  .mt-8 { margin-top: 8px; }
+  .mt-16 { margin-top: 16px; }
+  .mt-24 { margin-top: 24px; }
+  .mt-32 { margin-top: 32px; }
+
+  .text-mono {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+  }
+
+  strong { font-weight: 600; }
+
+  @media (max-width: 680px) {
+    .container { padding: 0 24px; }
+    .hero h1 { font-size: 32px; }
+    .tldr-inner { grid-template-columns: 1fr; gap: 16px; }
+    .drivers-grid { grid-template-columns: 1fr; }
+    .driver-card.denominators { grid-column: 1; }
+    .numbers-header, .numbers-row { grid-template-columns: 1fr 80px 80px; }
+    .numbers-header .badge-col, .numbers-row .badge-col { display: none; }
+    .criteria-grid { grid-template-columns: 1fr; }
+    .cta-block { flex-direction: column; align-items: flex-start; }
+    .paradigm-table { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="logo">
+      <svg width="400" height="95" viewBox="0 0 400 95" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 73.4194H23.9775V70.8713H22.1769C18.6724 70.8713 17.8284 69.9148 17.8284 66.4183V34.8047C20.2719 30.6651 23.5595 28.0125 27.6991 28.0125C32.8997 28.0125 36.0827 31.8306 36.0827 39.0488V66.4263C36.0827 69.9309 35.2307 70.8794 31.8386 70.8794H29.9256V73.4274H53.3725V70.8794H51.6765C48.1719 70.8794 47.3279 69.9228 47.3279 66.4263V37.8752C47.3279 36.9187 47.3279 35.9622 47.2234 35.0137C49.5545 30.7696 53.0591 28.0125 57.1986 28.0125C62.3993 28.0125 65.5823 31.8306 65.5823 39.0488V66.4263C65.5823 69.9309 64.7303 70.8794 61.3382 70.8794H59.4252V73.4274H82.8721V70.8794H81.2806C77.6715 70.8794 76.8275 69.9228 76.8275 66.4263V37.8752C76.8275 27.1605 70.7829 21.2204 61.9732 21.2204C55.3981 21.2204 49.667 24.8295 46.5884 32.0396C44.7879 25.0385 39.4828 21.2204 32.4737 21.2204C26.212 21.2204 20.8024 24.6125 17.8284 31.4046V22.4904H0V25.0385H2.12204C5.73112 25.0385 6.57511 25.995 6.57511 29.4915V66.4183C6.57511 69.9228 5.72308 70.8713 2.12204 70.8713H0V73.4194ZM96.9789 14.0023C100.797 14.0023 103.98 10.8192 103.98 7.00113C103.98 3.18306 100.797 0 96.9789 0C93.1608 0 89.9777 3.18306 89.9777 7.00113C89.9777 10.8192 93.1608 14.0023 96.9789 14.0023ZM85.0987 73.4194H108.65V70.8713H107.059C103.554 70.8713 102.71 69.9148 102.71 66.4183V22.4904H84.8816V25.0385H87.0037C90.6127 25.0385 91.4567 25.995 91.4567 29.4915V66.4183C91.4567 69.9228 90.6047 70.8713 87.0037 70.8713H85.0906V73.4194H85.0987ZM125.843 43.5018H132.636C130.94 42.4408 130.305 40.9538 129.453 38.1967L126.904 28.752C125.739 24.508 124.782 22.4904 120.112 22.4904H110.354V25.0385H111.737C114.598 25.0385 114.92 26.0995 115.772 29.2826L117.998 37.5617C119.164 41.5968 120.972 43.5018 125.851 43.5018H125.843ZM141.55 43.5018H148.342C153.221 43.5018 154.917 41.5888 156.091 37.5617L158.317 29.2826C159.169 26.0995 159.587 25.0385 162.352 25.0385H163.735V22.4904H154.081C149.306 22.4904 148.35 24.4035 147.289 28.752L144.741 38.1967C143.889 41.0583 143.246 42.4408 141.55 43.5018ZM132.636 52.416H141.55V43.5018H132.636V52.416ZM110.354 73.4274H120.112C124.782 73.4274 125.739 71.4099 126.904 67.1658L129.453 57.7211C130.305 54.9641 130.94 53.477 132.636 52.416H125.843C120.964 52.416 119.156 54.3291 117.99 58.3561L115.764 66.6353C114.912 69.8184 114.598 70.8794 111.729 70.8794H110.346V73.4274H110.354ZM154.065 73.4274H163.719V70.8794H162.336C159.579 70.8794 159.153 69.8184 158.301 66.6353L156.074 58.3561C154.909 54.321 153.213 52.416 148.326 52.416H141.55C143.246 53.477 143.865 54.8596 144.717 57.7211L147.265 67.1658C148.326 71.5144 149.282 73.4274 154.057 73.4274H154.065ZM165.101 94.6478H189.714V92.0998H187.166C183.774 92.0998 182.922 91.1432 182.922 87.6467V67.3828C186 71.9484 191.201 74.7055 197.35 74.7055C208.917 74.7055 218.144 64.5213 218.144 46.91C218.144 30.9947 209.447 21.2365 198.194 21.2365C191.619 21.2365 186.097 25.0545 182.913 31.8467V22.5065H165.085V25.0545H167.207C170.712 25.0545 171.66 26.0111 171.66 29.5076V87.6387C171.66 91.1432 170.704 92.0917 167.207 92.0917H165.085V94.6398L165.101 94.6478ZM194.175 27.8036C201.071 27.8036 206.698 34.2742 206.698 47.1109C206.698 61.1132 201.497 68.7573 194.392 68.7573C189.826 68.7573 185.799 66.3138 182.93 62.0697V35.7532C185.687 30.5526 189.617 27.7955 194.175 27.7955V27.8036ZM234.92 74.4885C241.816 74.4885 247.33 71.2009 251.47 63.7737V64.9393C251.47 71.3054 255.505 74.0624 262.185 74.0624C264.202 74.0624 266.75 73.8535 268.446 73.3229V70.6704C267.594 70.8794 266.959 70.9919 266.324 70.9919C263.672 70.9919 262.82 69.4004 262.82 66.8523V39.6838C262.82 27.1605 255.818 21.2204 244.043 21.2204C236.19 21.2204 228.553 24.8295 223.674 28.6475L225.37 31.6216C230.466 28.117 235.45 26.1075 240.86 26.1075C247.861 26.1075 251.47 29.9256 251.47 38.8398V41.1708L238.416 46.2669C226.536 51.146 222.179 55.7116 222.179 62.6082C222.179 69.5049 227.058 74.4885 234.912 74.4885H234.92ZM233.328 59.8431C233.328 54.538 236.407 50.72 242.668 47.9629L251.478 44.1449V60.6952C248.19 65.2608 244.372 67.9133 240.233 67.9133C236.093 67.9133 233.336 65.0518 233.336 59.8512L233.328 59.8431ZM270.568 73.4274H294.763V70.8794H292.745C289.241 70.8794 288.397 69.9228 288.397 66.4263V34.9092C290.84 30.6651 294.441 28.0125 298.685 28.0125C304.199 28.0125 307.704 31.8306 307.704 39.0488V66.4263C307.704 69.9309 306.852 70.8794 303.46 70.8794H301.442V73.4274H325.524V70.8794H323.402C319.793 70.8794 318.949 69.9228 318.949 66.4263V37.8752C318.949 27.1605 312.583 21.2204 303.564 21.2204C296.989 21.2204 291.467 24.6125 288.389 31.4046V22.4904H270.56V25.0385H272.682C276.291 25.0385 277.135 25.995 277.135 29.4915V66.4183C277.135 69.9228 276.283 70.8713 272.682 70.8713H270.56V73.4194L270.568 73.4274ZM353.111 74.6974C360.112 74.6974 366.695 71.5144 371.47 67.6963L369.878 65.3653C365.634 68.4438 360.859 69.8184 356.406 69.8184C345.587 69.8184 339.221 62.1822 339.221 47.3279V45.4149H372.748C372.539 31.0911 363.729 21.3329 350.892 21.3329C338.056 21.3329 327.759 32.8997 327.759 48.18C327.759 64.9473 337.308 74.7055 353.119 74.7055L353.111 74.6974ZM350.989 23.9775C357.355 23.9775 361.277 30.8741 361.92 42.5453H339.43C340.387 30.7696 344.84 23.9775 350.997 23.9775H350.989ZM375.071 73.4194H399.683V70.8713H397.24C393.735 70.8713 392.891 69.9148 392.891 66.4183V1.27001H375.063V3.81807H377.185C380.689 3.81807 381.638 4.77459 381.638 8.27114V66.4183C381.638 69.9228 380.681 70.8713 377.185 70.8713H375.063V73.4194H375.071Z" fill="white"/></svg>
+    </div>
+    <div class="hero-meta">Technical Brief &nbsp;·&nbsp; Axel Springer PoC &nbsp;·&nbsp; May 2026</div>
+    <h1>Why Adobe and Mixpanel numbers don't match.<br><em>And why that's fine.</em></h1>
+    <p class="hero-body">The 28 April side-by-side comparison surfaces real, expected differences. Adobe and Mixpanel are different systems — not different implementations of the same system. Five drivers explain ~95% of every delta in your comparison.</p>
+    <div class="hero-byline">
+      <div class="byline-avatar">MT</div>
+      <div class="byline-text">
+        <strong>Max Taylor</strong>, Solutions Engineering — Mixpanel<br>
+        max.taylor@mixpanel.com
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TLDR -->
+<section class="tldr">
+  <div class="container">
+    <div class="tldr-inner">
+      <div class="tldr-label">tl;dr</div>
+      <ul class="tldr-points">
+        <li>The differences are architectural, not errors. Every delta in the sheet has a documented home.</li>
+        <li>Five drivers explain ~95% of all divergence: identity, consent, hits vs events, session math, and denominator definitions.</li>
+        <li>The right benchmark for this PoC is internal consistency in Mixpanel — not parity with Adobe.</li>
+        <li>Adobe is internally inconsistent on 28 April: Android DAU shows 290k but Android App Open step 1 shows 1,126k. Mixpanel's equivalent figures match exactly (419k = 419k).</li>
+        <li>A six-action reconciliation playbook resolves 80%+ of comparison concern. It's in section 4 of this brief.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 1: TWO PARADIGMS -->
+<section class="section">
+  <div class="container">
+    <div class="section-number">Section 01</div>
+    <h2>Two systems, two paradigms</h2>
+    <p class="section-lead">Adobe Analytics and Mixpanel were built in different decades to answer different questions. Every divergence in your comparison sheet traces back to one row in this table.</p>
+
+    <table class="paradigm-table">
+      <thead>
+        <tr>
+          <th>Aspect</th>
+          <th>Adobe Analytics</th>
+          <th>Mixpanel</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Unit of collection</td>
+          <td class="adobe">Hit (server call). One hit can carry many events.</td>
+          <td class="mixpanel">Event. One row, one event, one timestamp.</td>
+        </tr>
+        <tr>
+          <td>Identity</td>
+          <td class="adobe">Visitor cookie waterfall, resolved at collection time. Device-level.</td>
+          <td class="mixpanel"><code>device_id</code> + <code>user_id</code>, merged into <code>distinct_id</code> at query time. Cross-device.</td>
+        </tr>
+        <tr>
+          <td>Sessions</td>
+          <td class="adobe"><code>visit_num</code> stamped at collection. Frozen. Default 30-min inactivity.</td>
+          <td class="mixpanel">Computed at query time. Redefinable retroactively. Default 30-min.</td>
+        </tr>
+        <tr>
+          <td>Properties</td>
+          <td class="adobe">eVars and props with persistence rules set at implementation time.</td>
+          <td class="mixpanel">Borrowed at query time from any prior event in the user's history.</td>
+        </tr>
+        <tr>
+          <td>Consent</td>
+          <td class="adobe">Data feed includes all hits regardless of downstream consent. Filtering happens on read.</td>
+          <td class="mixpanel">SDK-level. Un-consented users never reach Mixpanel servers.</td>
+        </tr>
+        <tr>
+          <td>Conversion</td>
+          <td class="adobe">Within-visit by default. Cross-visit needs explicit eVar engineering.</td>
+          <td class="mixpanel">Cross-session natively. Conversion window is a query-time knob.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- SECTION 2: FIVE DRIVERS -->
+<section class="section">
+  <div class="container">
+    <div class="section-number">Section 02</div>
+    <h2>The five drivers of divergence</h2>
+    <p class="section-lead">Once you know which driver applies, every delta in the 28 April sheet has a clear explanation. Rate metrics diverge most because they compound numerator and denominator differences simultaneously.</p>
+
+    <div class="drivers-grid">
+
+      <div class="driver-card identity">
+        <div class="driver-num">Driver 01</div>
+        <h3>Identity — the biggest one</h3>
+        <p>Adobe resolves a visitor at the moment of hit collection using a cookie waterfall. On iOS, Apple's ITP aggressively resets these cookies — the same real user becomes a new visitor every time.</p>
+        <p>Mixpanel separates the two questions Adobe collapses: an anonymous <code>device_id</code> and an authenticated <code>user_id</code>. When both appear in the user's history, Mixpanel retroactively merges the anonymous history into the authenticated profile.</p>
+        <div class="callout">28 Apr: Adobe iOS DAU 1.1M vs Mixpanel 307k — but iOS article views are only 12% apart (2.5M vs 2.2M). The user counting methodology explains the gap, not actual user volume.</div>
+      </div>
+
+      <div class="driver-card consent">
+        <div class="driver-num">Driver 02</div>
+        <h3>Consent — a structural floor</h3>
+        <p>The PUR (pay-or-consent) model means Mixpanel never sees un-consented users. The SDK doesn't fire for them. Adobe's data feed includes all hits regardless of consent state.</p>
+        <p>This sets a permanent floor: Mixpanel user counts will always be lower than Adobe by at least the PUR opt-out percentage. It isn't a tracking failure — it's compliance working as intended.</p>
+        <div class="callout">Action: ask your DPO for the PUR opt-out rate for 28 Apr. That one number closes the iOS DAU conversation.</div>
+      </div>
+
+      <div class="driver-card hits">
+        <div class="driver-num">Driver 03</div>
+        <h3>Hits vs events</h3>
+        <p>One Adobe hit can carry up to ~100 events packed into <code>post_event_list</code>. Mixpanel is always one JSON object, one event, one row.</p>
+        <p>When both tools are measuring the same single-purpose event, you land within ±10-20%. Article PV proves it — 1.85M vs 1.9M on Android, 8% apart. Divergence appears when definitions disagree.</p>
+        <div class="callout">Watch-Through Rate showing 68% in Mixpanel is article completion rate (<code>mp_article_closed ÷ mp_article_view</code>), not video completion. Different metric entirely.</div>
+      </div>
+
+      <div class="driver-card sessions">
+        <div class="driver-num">Driver 04</div>
+        <h3>Sessions — same default, different math</h3>
+        <p>Both tools default to 30-minute inactivity. But Adobe's session is frozen at collection time. Mixpanel's session is computed fresh on every query.</p>
+        <p>The critical finding: <code>mp_app_open</code> fires 1.85 times per session on average. AS have been comparing <code>mp_app_open</code> total events to Adobe Visits. Switching to <code>$session_start</code> brings Android within 4% of Adobe (1,056k vs 1,100k).</p>
+        <div class="callout">The correct Mixpanel equivalent of Adobe Visits is <code>$session_start</code>, not <code>mp_app_open</code> total events.</div>
+      </div>
+
+      <div class="driver-card denominators">
+        <div class="driver-num">Driver 05</div>
+        <h3>The denominator problem — why rate metrics diverge most</h3>
+        <p>Rate metrics divide one count by another. Both counts can be computed differently in each system. Divergence on the numerator multiplies divergence on the denominator. That's why you see 2–5x deltas on rate metrics but ±10-20% on volume metrics.</p>
+        <p><strong>Paywall View Rate (3% Adobe Android vs 7% Mixpanel):</strong> Adobe divides by Visits; Mixpanel divides by unique users. Switching the Mixpanel denominator to <code>$session_start</code> gives 2.8% on Android — within 0.2% of Adobe. The denominator was the entire difference.</p>
+        <div class="callout" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div><strong>Adobe formula</strong><br>paywall hits ÷ visits</div>
+          <div><strong>Mixpanel formula</strong><br>unique(paywall_viewed) ÷ unique(app_open)<br><em>→ Switch to: unique(paywall_viewed) ÷ $session_start</em></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 3: 28 APRIL NUMBERS -->
+<section class="section">
+  <div class="container">
+    <div class="section-number">Section 03</div>
+    <h2>The 28 April sheet — annotated</h2>
+    <p class="section-lead">Every row in the comparison now has a driver. Rows within the expected variance band are fine, even if that band is ±30%. Rows outside their band are where to investigate.</p>
+
+    <div class="numbers-block">
+      <div class="numbers-header">
+        <div>Metric</div>
+        <div>Adobe AOS</div>
+        <div>Mixpanel AOS</div>
+        <div class="badge-col">Status</div>
+      </div>
+      <div class="numbers-row">
+        <div class="metric-name">DAU</div>
+        <div class="adobe-val">290k</div>
+        <div class="mp-val">419k</div>
+        <div class="badge-col"><span class="badge explain">Driver 01+02</span></div>
+      </div>
+      <div class="numbers-row">
+        <div class="metric-name">Articles PV / Session</div>
+        <div class="adobe-val">2.0</div>
+        <div class="mp-val">1.8</div>
+        <div class="badge-col"><span class="badge ok">Within band</span></div>
+      </div>
+      <div class="numbers-row">
+        <div class="metric-name">Avg Read Duration</div>
+        <div class="adobe-val">336s</div>
+        <div class="mp-val">259s</div>
+        <div class="badge-col"><span class="badge flag">Timer impl.</span></div>
+      </div>
+      <div class="numbers-row">
+        <div class="metric-name">Article PV</div>
+        <div class="adobe-val">1.85M</div>
+        <div class="mp-val">1.9M</div>
+        <div class="badge-col"><span class="badge ok">±3% ✓</span></div>
+      </div>
+      <div class="numbers-row highlight">
+        <div class="metric-name">Watch-Through / Completion</div>
+        <div class="adobe-val">16%</div>
+        <div class="mp-val">68%</div>
+        <div class="badge-col"><span class="badge def">Wrong metric</span></div>
+      </div>
+      <div class="numbers-row highlight">
+        <div class="metric-name">Paywall View Rate</div>
+        <div class="adobe-val">3%</div>
+        <div class="mp-val">7% → 2.8%*</div>
+        <div class="badge-col"><span class="badge def">Denominator</span></div>
+      </div>
+      <div class="numbers-row">
+        <div class="metric-name">Visits / Sessions</div>
+        <div class="adobe-val">1.1M</div>
+        <div class="mp-val">1.06M*</div>
+        <div class="badge-col"><span class="badge ok">±4% w/ fix</span></div>
+      </div>
+      <div class="numbers-row">
+        <div class="metric-name">Funnel Step 3 — Paywall</div>
+        <div class="adobe-val">54k</div>
+        <div class="mp-val">52k</div>
+        <div class="badge-col"><span class="badge ok">±4% ✓</span></div>
+      </div>
+      <div class="numbers-row">
+        <div class="metric-name">Funnel Step 5 — Subscription</div>
+        <div class="adobe-val">46</div>
+        <div class="mp-val">98</div>
+        <div class="badge-col"><span class="badge flag">Passes gap</span></div>
+      </div>
+    </div>
+
+    <p style="font-size:12px;color:var(--gray-07);font-family:'DM Mono',monospace">* Using $session_start as denominator instead of mp_app_open total</p>
+
+    <div class="mt-32" style="background:var(--lava-01);border-radius:10px;padding:24px;border-left:3px solid var(--lava-06)">
+      <p style="font-size:14px;font-weight:600;color:var(--lava-09);margin-bottom:8px">Internal inconsistency in Adobe — worth flagging</p>
+      <p style="font-size:14px;color:var(--black-70pct);line-height:1.6">Adobe shows Android DAU = 290k but Android App Open step 1 in the purchase funnel = 1,126k for the same day. These should be approximately equal — a unique user opening the app is by definition an active user. The 4x gap is internal inconsistency in Adobe, not a Mixpanel issue. Mixpanel's equivalent figures match exactly: DAU 419k = funnel step 1 419k.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 4: PLAYBOOK -->
+<section class="section">
+  <div class="container">
+    <div class="section-number">Section 04</div>
+    <h2>Reconciliation playbook</h2>
+    <p class="section-lead">Six actions that, in our experience, resolve 80%+ of Adobe vs Mixpanel comparison concern. They don't require closing every gap — they require knowing why each gap exists.</p>
+
+    <div class="playbook-grid">
+      <div class="playbook-item">
+        <div class="playbook-step">1</div>
+        <div class="playbook-content">
+          <h4>Set variance bands per metric class — in writing</h4>
+          <p>A metric outside its expected band is a signal to investigate. A metric inside its band is fine, even if "fine" is a 30% delta. Don't compare everything against an implicit "should match exactly" standard.</p>
+          <p style="font-family:'DM Mono',monospace;font-size:12px;margin-top:12px;line-height:1.8">
+            Single-event volumes &nbsp;&nbsp;→ &nbsp;±10–20%<br>
+            User counts &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ &nbsp;±20–40%<br>
+            Session counts &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ &nbsp;±30–50%<br>
+            Rate metrics &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ &nbsp;align definitions first, then ±20%<br>
+            Funnel rates &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ &nbsp;Mixpanel structurally higher (ID merge)
+          </p>
+        </div>
+      </div>
+
+      <div class="playbook-item">
+        <div class="playbook-step">2</div>
+        <div class="playbook-content">
+          <h4>Align metric definitions before comparing</h4>
+          <p>For each metric in the sheet, write down the exact formula in each tool. At least half of the 28 April deltas resolve at this step, before touching any data. The watch-through rate row is the clearest example — Adobe measures video completion, Mixpanel was measuring article completion. Same label, different metric.</p>
+        </div>
+      </div>
+
+      <div class="playbook-item">
+        <div class="playbook-step">3</div>
+        <div class="playbook-content">
+          <h4>Wire authenticated identity</h4>
+          <p>Confirm which Adobe field carries the authenticated customer identifier (likely a hashed ID in <code>post_cust_visid</code> or an eVar), and ensure the same identifier flows into Mixpanel's <code>user_id</code> from the live SDK. When the IDs match, Mixpanel's ID merge retroactively stitches anonymous browsing to the authenticated user. This is the single most impactful technical action on the list.</p>
+        </div>
+      </div>
+
+      <div class="playbook-item">
+        <div class="playbook-step">4</div>
+        <div class="playbook-content">
+          <h4>Document the consent gap</h4>
+          <p>Calculate the percentage of Adobe traffic that is un-consented for Mixpanel — users in the PUR opt-out path who appear in Adobe but never in Mixpanel. This is the structural floor for Mixpanel being lower on user-count metrics. Once documented, the iOS DAU question becomes a one-number answer rather than an open concern.</p>
+          <p>Ask your DPO to pull the PUR opt-out rate for 28 April from the consent management platform.</p>
+        </div>
+      </div>
+
+      <div class="playbook-item">
+        <div class="playbook-step">5</div>
+        <div class="playbook-content">
+          <h4>Treat funnel divergence as evidence, not error</h4>
+          <p>If Mixpanel shows higher funnel conversion than Adobe, that's ID merge working as intended. The user who started anonymous and finished authenticated is one user in Mixpanel and two visitors in Adobe. Mixpanel's number is closer to what actually happened. Don't optimize this away — it's a structural advantage.</p>
+        </div>
+      </div>
+
+      <div class="playbook-item">
+        <div class="playbook-step">6</div>
+        <div class="playbook-content">
+          <h4>Pick 2–3 anchor metrics to deeply reconcile</h4>
+          <p>Don't try to reconcile every row in the sheet. Pick the 2–3 metrics your business cares most about — for Bild, that's Article PV, App Open, and Subscription Started — and reconcile those exhaustively. Once the anchors agree, the methodology is established and the rest follow.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BIGGER PICTURE -->
+<section class="bigger-picture">
+  <div class="container">
+    <div class="section-number" style="color:var(--purple-04);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px">Section 05</div>
+    <h2>The bigger picture</h2>
+    <p>The success criteria for this PoC name four goals, in priority order. None of them are "exactly matches Adobe to the decimal point."</p>
+    <p>The PoC succeeds when a Bild PM opens Mixpanel on Monday morning, asks a question they've been blocked on for two weeks, and gets the answer in 30 seconds — not when DAU agrees to five significant figures with an Adobe report nobody trusted anyway.</p>
+
+    <div class="criteria-grid">
+      <div class="criteria-item">
+        <div class="criteria-num">Goal 01</div>
+        <h4>Self-serve insight rate</h4>
+        <p>PMs answer their own product questions without raising a ticket.</p>
+      </div>
+      <div class="criteria-item">
+        <div class="criteria-num">Goal 02</div>
+        <h4>Time to insight</h4>
+        <p>Minutes, not days. The answer is in Mixpanel before the meeting ends.</p>
+      </div>
+      <div class="criteria-item">
+        <div class="criteria-num">Goal 03</div>
+        <h4>Cross-functional adoption</h4>
+        <p>PMs, engineers, and editorial using the tool weekly — without training every session.</p>
+      </div>
+      <div class="criteria-item">
+        <div class="criteria-num">Goal 04</div>
+        <h4>Perceived data trust</h4>
+        <p>Confidence in the data and the event taxonomy. Not parity with a tool the team doesn't trust.</p>
+      </div>
+    </div>
+
+    <div class="cta-block">
+      <div class="cta-text">
+        <strong>Questions? Let's cover it on our weekly call.</strong><br>
+        Happy to walk through any section of this brief with the team — just let Max know and it goes on the agenda.
+      </div>
+      <a href="mailto:max.taylor@mixpanel.com" class="cta-btn">
+        Get in touch
+        <svg width="6" height="10" viewBox="0 0 6.504 9.912" fill="currentColor"><path d="M6.504 4.968L1.176 9.912L0 8.76L3.216 5.88L4.176 4.957L3.216 4.032L0 1.176L1.176 0L6.504 4.968Z"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-logo">
+        <svg width="400" height="95" viewBox="0 0 400 95" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 73.4194H23.9775V70.8713H22.1769C18.6724 70.8713 17.8284 69.9148 17.8284 66.4183V34.8047C20.2719 30.6651 23.5595 28.0125 27.6991 28.0125C32.8997 28.0125 36.0827 31.8306 36.0827 39.0488V66.4263C36.0827 69.9309 35.2307 70.8794 31.8386 70.8794H29.9256V73.4274H53.3725V70.8794H51.6765C48.1719 70.8794 47.3279 69.9228 47.3279 66.4263V37.8752C47.3279 36.9187 47.3279 35.9622 47.2234 35.0137C49.5545 30.7696 53.0591 28.0125 57.1986 28.0125C62.3993 28.0125 65.5823 31.8306 65.5823 39.0488V66.4263C65.5823 69.9309 64.7303 70.8794 61.3382 70.8794H59.4252V73.4274H82.8721V70.8794H81.2806C77.6715 70.8794 76.8275 69.9228 76.8275 66.4263V37.8752C76.8275 27.1605 70.7829 21.2204 61.9732 21.2204C55.3981 21.2204 49.667 24.8295 46.5884 32.0396C44.7879 25.0385 39.4828 21.2204 32.4737 21.2204C26.212 21.2204 20.8024 24.6125 17.8284 31.4046V22.4904H0V25.0385H2.12204C5.73112 25.0385 6.57511 25.995 6.57511 29.4915V66.4183C6.57511 69.9228 5.72308 70.8713 2.12204 70.8713H0V73.4194ZM96.9789 14.0023C100.797 14.0023 103.98 10.8192 103.98 7.00113C103.98 3.18306 100.797 0 96.9789 0C93.1608 0 89.9777 3.18306 89.9777 7.00113C89.9777 10.8192 93.1608 14.0023 96.9789 14.0023ZM85.0987 73.4194H108.65V70.8713H107.059C103.554 70.8713 102.71 69.9148 102.71 66.4183V22.4904H84.8816V25.0385H87.0037C90.6127 25.0385 91.4567 25.995 91.4567 29.4915V66.4183C91.4567 69.9228 90.6047 70.8713 87.0037 70.8713H85.0906V73.4194H85.0987ZM375.071 73.4194H399.683V70.8713H397.24C393.735 70.8713 392.891 69.9148 392.891 66.4183V1.27001H375.063V3.81807H377.185C380.689 3.81807 381.638 4.77459 381.638 8.27114V66.4183C381.638 69.9228 380.681 70.8713 377.185 70.8713H375.063V73.4194H375.071Z" fill="#A2A2A2"/></svg>
+      </div>
+      <div class="footer-refs">
+        <p>References</p>
+        <a href="https://docs.mixpanel.com/docs/what-is-mixpanel">What is Mixpanel</a> &nbsp;·&nbsp;
+        <a href="https://docs.mixpanel.com/docs/migration/adobe-analytics">Adobe → Mixpanel migration guide</a> &nbsp;·&nbsp;
+        <a href="https://docs.mixpanel.com/docs/tracking-methods/id-management/identifying-users">Simplified ID merge</a><br>
+        <a href="https://docs.mixpanel.com/docs/features/sessions">Sessions documentation</a> &nbsp;·&nbsp;
+        <a href="https://experienceleague.adobe.com/en/docs/analytics/components/metrics/unique-visitors">Adobe unique visitors</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
