@@ -191,7 +191,7 @@ This automatically sends UTM data from AppsFlyer to Mixpanel as user properties,
 
 **Relevant docs:**
 - [AppsFlyer integration with Mixpanel](https://docs.mixpanel.com/docs/tracking-methods/integrations/mobile-attribution-tracking)
-- [AppsFlyer Mixpanel partner docs](https://support.appsflyer.com/hc/en-us/articles/211200306-Mixpanel-integration)
+- [AppsFlyer Mixpanel partner docs](https://support.appsflyer.com/hc/en-us/articles/207447103-Mixpanel-integration-with-AppsFlyer)
 
 ---
 
