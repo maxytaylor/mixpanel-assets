@@ -1,4 +1,4 @@
-# Identity Management — Plain English Guide
+# Identity Management — Guide
 
 ---
 
