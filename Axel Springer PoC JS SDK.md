@@ -1,18 +1,22 @@
-# Bild Web — Mixpanel JavaScript SDK Implementation Guide
+# Bild Web — Mixpanel via Tealium iQ Implementation Guide
 
-This guide covers Mixpanel tracking for **bild.de** (web), focused on affiliate marketing analytics. It maps core Mixpanel JS SDK concepts directly to Bild's affiliate use cases — page views, button clicks, affiliate link tracking, conversion paths, identity management, user attributes, and UTM capture.
+This guide covers Mixpanel tracking for **bild.de** (web) via Tealium iQ, focused on affiliate marketing analytics. It maps Mixpanel's Tealium integration directly to Bild's existing tag hook setup — covering page views, affiliate link tracking, conversion paths, identity management, and UTM capture.
+
+> **How this works:** The Mixpanel Tealium tag wraps the Mixpanel JS SDK. This means Tealium handles deployment and event triggering via your existing UDO data layer, while the full SDK runs underneath — giving you Mixpanel's default properties, identity management, and UTM capture automatically. You do not need to write `mixpanel.track()` calls manually; Tealium's data mappings handle this for you.
 
 ---
 
 ## Contents
 
-- [How to load the SDK via Tealium](#how-to-load-the-sdk-via-tealium)
-- [SDK initialisation](#sdk-initialisation)
-- [Tracking page views](#tracking-page-views)
-- [Tracking button clicks](#tracking-button-clicks)
-- [Tracking affiliate link clicks](#tracking-affiliate-link-clicks)
+- [Prerequisite — tag hooks](#prerequisite--tag-hooks)
+- [Connecting Mixpanel to Tealium iQ](#connecting-mixpanel-to-tealium-iq)
+- [SDK initialisation config](#sdk-initialisation-config)
+- [Privacy and consent management](#privacy-and-consent-management)
+- [Sending events via data mappings](#sending-events-via-data-mappings)
+- [Adding event properties from the UDO](#adding-event-properties-from-the-udo)
+- [Affiliate link tracking](#affiliate-link-tracking)
 - [Path to success — conversion funnel](#path-to-success--conversion-funnel)
-- [Identity management](#identity-management)
+- [Identifying users](#identifying-users)
 - [Setting user attributes](#setting-user-attributes)
 - [UTM and campaign attribution](#utm-and-campaign-attribution)
 - [Complete event property reference](#complete-event-property-reference)
@@ -20,40 +24,58 @@ This guide covers Mixpanel tracking for **bild.de** (web), focused on affiliate 
 
 ---
 
-## How to load the SDK via Tealium
+## Prerequisite — tag hooks
 
-Load the Mixpanel JS SDK as a JavaScript tag through Tealium rather than using Tealium's native Mixpanel connector. This gives you full access to the SDK — custom event properties, identity management, UTM capture — exactly as documented below.
+Tealium iQ works through a Universal Data Object (UDO) — a JavaScript object on every page that holds structured data about the current page, user, and event. Events are triggered by setting a `tealium_event` value in the UDO, which Tealium picks up and routes to connected tags.
 
-**In Tealium iQ:**
-1. Go to **Tags → Add Tag → Custom JavaScript**
-2. Paste the Mixpanel SDK snippet (see [SDK initialisation](#sdk-initialisation) below) as the tag code
-3. Set the load rule to fire on **All Pages**
-4. Publish the tag
+If you have been using Tealium for a while you almost certainly have `tealium_event` already mapped as a UDO variable. If not, here is how to add it:
 
-Once the tag is live, all tracking code in this guide runs directly from the SDK — Tealium is simply the delivery mechanism.
+1. Go to **Data Layer** in the Tealium iQ main menu
+2. Click **Add Variable**
+3. Set type to **UDO Variable** and source to `tealium_event`
+4. Click **Apply**, then **Save and Publish**
+
+Your UDO variables should then include `tealium_event` as a mapped variable. This is what Mixpanel's data mappings will use to trigger events.
+
+Your existing UDO likely already contains events such as `page_view`, `product_view`, `button_click` etc. These are the hooks you will map to Mixpanel events in the steps below — no new instrumentation needed for events that already exist in the UDO.
+
+**For new events not in your UDO** (e.g. `affiliate_link_click`), you will need to add them to the UDO data layer and ensure they fire at the right moment. See [Affiliate link tracking](#affiliate-link-tracking) below.
 
 ---
 
-## SDK initialisation
+## Connecting Mixpanel to Tealium iQ
 
-Run this once when the SDK loads. It sets up the Mixpanel instance before any tracking calls.
+1. Go to **Tags** in Tealium iQ and click **Add Tag**
+2. Search for **Mixpanel** and click **Add**
+3. Enter your **Mixpanel project token** — this is found in your Mixpanel project settings
+4. Set **Load Rules** — for testing, load on all pages. For production, add a consent condition (see [Privacy and consent management](#privacy-and-consent-management))
+5. Proceed to the **Data Mappings** section — this is where events are configured
+6. **Save and Publish**
+
+> **EU data residency:** The Bild project uses EU data residency. After adding the tag, confirm the `api_host` is set to `https://api-eu.mixpanel.com` in the tag configuration. Events sent to the wrong region will not be ingested.
+
+**Full Mixpanel docs for this step:** https://docs.mixpanel.com/docs/tracking-methods/integrations/tealium
+
+---
+
+## SDK initialisation config
+
+Because Tealium wraps the Mixpanel JS SDK, the following configuration is applied inside the Tealium tag rather than in your site's source code. These settings control how the SDK behaves once Tealium deploys it.
 
 ```javascript
 mixpanel.init('<your_project_token>', {
     debug: false,
-    persistence: 'localStorage',          // avoids cookie consent complications
-    track_pageview: false,                 // we track page views manually for full control
-    opt_out_tracking_by_default: true,     // GDPR: all users start opted out
-    api_host: 'https://api-eu.mixpanel.com', // EU data residency — required for this project
-    stop_utm_persistence: false            // keep UTMs as super properties (see UTM section)
+    persistence: 'localStorage',            // avoids cookie consent complications
+    track_pageview: false,                   // page views tracked via UDO mapping below
+    opt_out_tracking_by_default: true,       // GDPR: all users start opted out
+    api_host: 'https://api-eu.mixpanel.com', // EU data residency — required
+    stop_utm_persistence: true               // UTMs read fresh on each page load
 });
 ```
 
-> **Important — EU data residency:** The Bild project uses EU data residency. The `api_host` must always be set to `https://api-eu.mixpanel.com` or events will be routed to the US servers and will not be ingested into this project.
+> **EU data residency:** Must always be set. Events sent without this will not be ingested into the Bild project.
 
-> **Important — opt out by default:** With `opt_out_tracking_by_default: true`, the SDK initialises with tracking disabled for all users. No events will be sent until `mixpanel.opt_in_tracking()` is called. This means the consent flow below must be in place before any tracking fires.
-
-Immediately after init, capture and register UTMs (see [UTM section](#utm-and-campaign-attribution)) and check for a logged-in user (see [Identity management](#identity-management)) before any `track()` calls.
+> **Opt out by default:** No events fire until `mixpanel.opt_in_tracking()` is called. The consent flow below must be in place before any data is sent.
 
 ---
 
@@ -129,117 +151,92 @@ if (mixpanel.has_opted_in_tracking()) {
 
 ---
 
-## Tracking page views
+## Sending events via data mappings
 
-Track on every page load. Attach the page type and any UTMs so every page view is attributable to a campaign.
+Events are sent to Mixpanel by mapping `tealium_event` values to Mixpanel's `track` method in the Tealium data mappings UI. Each mapping says: "when this UDO event fires, call `mixpanel.track()` with this event name."
 
-```javascript
-// Call on every page load
-mixpanel.track('page_viewed', {
-    'page_url':      window.location.pathname,
-    'page_title':    document.title,
-    'page_type':     getPageType(),   // 'article', 'affiliate_landing', 'home', 'search', 'comparison'
-    'referrer':      document.referrer,
-    'utm_source':    getUTMParam('utm_source'),
-    'utm_medium':    getUTMParam('utm_medium'),
-    'utm_campaign':  getUTMParam('utm_campaign'),
-    'utm_content':   getUTMParam('utm_content'),
-    'utm_term':      getUTMParam('utm_term')
-});
-```
+**In Tealium data mappings:**
 
-**What this unlocks in Mixpanel:**
-- Which pages drive the most traffic and from which campaigns
-- Entry point analysis — where do users land before clicking an affiliate link
-- Referrer breakdown to understand organic vs paid vs direct traffic
+1. Select variable: `tealium_event`
+2. Set trigger value: the UDO event name (e.g. `page_view`)
+3. Bind to: `track`
+4. Add a custom value for the Mixpanel event name (e.g. `page_viewed`)
+5. Map that custom value to `track → eventName`
 
----
+Repeat this for each event you want to send to Mixpanel. Your existing UDO events map directly — if `page_view` already fires for Adobe, the same hook sends it to Mixpanel.
 
-## Tracking button clicks
+**Events to map from existing UDO hooks:**
 
-Track any significant button interaction — newsletter signups, login prompts, app download banners, paywall CTAs.
-
-```javascript
-document.querySelectorAll('[data-track-click]').forEach(button => {
-    button.addEventListener('click', function() {
-        mixpanel.track('button_clicked', {
-            'button_name':    this.dataset.trackClick,   // e.g. 'newsletter_signup', 'app_download'
-            'button_location': this.dataset.location,    // e.g. 'article_footer', 'sidebar', 'hero'
-            'page_url':       window.location.pathname,
-            'page_type':      getPageType()
-        });
-    });
-});
-```
-
-Add `data-track-click="button_name"` and `data-location="location"` attributes to any button in the HTML you want to track — no additional JavaScript needed per button.
+| UDO `tealium_event` | Mixpanel event name | Notes |
+|---|---|---|
+| `page_view` | `page_viewed` | Already firing for Adobe |
+| `product_view` | `product_viewed` | Already firing if in UDO |
+| `button_click` | `button_clicked` | Already firing if in UDO |
+| `affiliate_click` | `affiliate_link_clicked` | May need adding — see below |
+| `login` | `login_completed` | Triggers `identify()` — see identity section |
+| `registration` | `registration_completed` | Triggers `identify()` — see identity section |
 
 ---
 
-## Tracking affiliate link clicks
+## Adding event properties from the UDO
 
-The most important event for affiliate analytics. Fires when a user clicks any outbound affiliate link to Amazon, Otto, Zalando, or other partners.
+Custom event properties are mapped from UDO variables to Mixpanel using the pattern `track.properties.KEY_NAME` in the data mappings UI, where `KEY_NAME` is the property label that will appear in Mixpanel.
 
-```javascript
-// Attach to all affiliate links
-document.querySelectorAll('[data-affiliate]').forEach(link => {
-    link.addEventListener('click', function() {
-        mixpanel.track('affiliate_link_clicked', {
-            'affiliate_partner':  this.dataset.affiliatePartner,  // 'amazon', 'otto', 'zalando'
-            'product_id':         this.dataset.productId,
-            'product_name':       this.dataset.productName,
-            'product_category':   this.dataset.productCategory,   // 'electronics', 'fashion', 'books'
-            'affiliate_url':      this.href,
-            'article_id':         getArticleId(),
-            'article_title':      getArticleTitle(),
-            'position_in_page':   getLinkPosition(this),          // Int — 1-indexed position on page
-            'page_type':          getPageType(),
-            'utm_source':         getUTMParam('utm_source'),
-            'utm_medium':         getUTMParam('utm_medium'),
-            'utm_campaign':       getUTMParam('utm_campaign')
-        });
-    });
-});
-```
+**In Tealium data mappings, for each property:**
 
-**Add these data attributes to affiliate links in HTML:**
-```html
-<a href="https://amazon.de/product/..."
-   data-affiliate
-   data-affiliate-partner="amazon"
-   data-product-id="B08N5WRWNW"
-   data-product-name="Sony WH-1000XM5"
-   data-product-category="electronics">
-   Buy on Amazon
-</a>
-```
+1. Select the UDO variable (e.g. `page_name`, `article_id`, `affiliate_partner`)
+2. Bind to: `track.properties.KEY_NAME` (e.g. `track.properties.article_id`)
 
-**Important — dynamically injected affiliate links:**
-If affiliate links are injected by a third-party network script after page load, use event delegation instead:
+The value will be read from the UDO at runtime and sent to Mixpanel as an event property.
+
+**If these UDO variables already exist in your data layer for Adobe, no new instrumentation is needed — just map them to Mixpanel.**
+
+Example mappings for the `page_viewed` event:
+
+| UDO variable | Mixpanel property | Maps to |
+|---|---|---|
+| `page_name` | `page_type` | `track.properties.page_type` |
+| `article_id` | `article_id` | `track.properties.article_id` |
+| `article_name` | `article_title` | `track.properties.article_title` |
+| `utm_source` | `utm_source` | `track.properties.utm_source` |
+
+> **Default properties:** Because the Mixpanel tag wraps the JS SDK, Mixpanel's default properties (`$browser`, `$os`, `$current_url`, `$referrer` etc) are automatically included on every event. You do not need to map these manually.
+
+---
+
+## Affiliate link tracking
+
+This is the most important event for the affiliate use case. If `affiliate_link_click` (or equivalent) already exists in your Tealium UDO, map it exactly as above. If it does not exist yet, it needs to be added to the data layer.
+
+**Adding to the UDO if not already present:**
 
 ```javascript
-// Attach to document body — catches dynamically injected links
-document.body.addEventListener('click', function(e) {
-    const link = e.target.closest('[data-affiliate]');
-    if (link) {
-        mixpanel.track('affiliate_link_clicked', {
-            'affiliate_partner': link.dataset.affiliatePartner,
-            'product_id':        link.dataset.productId,
-            'product_name':      link.dataset.productName,
-            'product_category':  link.dataset.productCategory,
-            'affiliate_url':     link.href,
-            'article_id':        getArticleId(),
-            'position_in_page':  getLinkPosition(link)
-        });
-    }
-});
+// Fire when a user clicks an affiliate link
+// Add this to the page JavaScript or via a Tealium extension
+utag_data.tealium_event = 'affiliate_link_click';
+utag_data.affiliate_partner = 'amazon';     // amazon, otto, zalando
+utag_data.product_id = '12345';
+utag_data.product_name = 'Sony WH-1000XM5';
+utag_data.product_category = 'electronics';
+utag_data.affiliate_url = 'https://amazon.de/...';
+utag_data.article_id = getCurrentArticleId();
+utag_data.position_in_page = getLinkPosition(element); // must be a number
+utag.link(utag_data);  // fires the UDO event
 ```
 
-**What this unlocks in Mixpanel:**
-- Which affiliate partners drive the most clicks
-- Which articles and content types generate the most affiliate engagement
-- Which page positions convert best (`position_in_page` histogram)
-- Which campaigns drive users who click affiliate links
+**Then in Tealium data mappings, map these UDO variables:**
+
+| UDO variable | Mixpanel property |
+|---|---|
+| `affiliate_partner` | `track.properties.affiliate_partner` |
+| `product_id` | `track.properties.product_id` |
+| `product_name` | `track.properties.product_name` |
+| `product_category` | `track.properties.product_category` |
+| `affiliate_url` | `track.properties.affiliate_url` |
+| `article_id` | `track.properties.article_id` |
+| `position_in_page` | `track.properties.position_in_page` |
+
+> `position_in_page` must be a **number** in the UDO — not a string. This enables histogram analysis of which page positions drive the most affiliate clicks.
 
 ---
 
@@ -291,69 +288,44 @@ Break down by `affiliate_partner` to compare Amazon vs Otto vs others, or by `ut
 
 ---
 
-## Identity management
+## Identifying users
 
-Web users are anonymous by default. Mixpanel assigns each new visitor a random device ID stored in localStorage. You only need to call `identify()` when a user logs in or registers.
+Identity is handled through Tealium data mappings by binding a UDO variable containing the user ID to Mixpanel's `identify` method. This should only be called on authenticated (logged-in) pages or actions — never for anonymous users.
 
-### On page load — check for existing logged-in user
+**In Tealium data mappings:**
 
-```javascript
-// Run on every page load before any track() calls
-function initMixpanelIdentity() {
-    const storedUserId = localStorage.getItem('bild_user_id');
-    if (storedUserId) {
-        mixpanel.identify(storedUserId);   // link this session to the known user
-    }
-    // If no stored ID, user is anonymous — do nothing, Mixpanel handles it
-}
+1. Select the UDO variable that holds the user's unique ID (e.g. `user_id`, `csuid`, `id_of_user`)
+2. Set trigger: the UDO event that fires at login (e.g. `login`, `sign_in`)
+3. Bind to: `identify`
+4. Map the user ID variable to `identify → uniqueID`
 
-initMixpanelIdentity(); // call before any track() calls
-```
+This tells Tealium: "when the `login` UDO event fires, call `mixpanel.identify()` with the value of `user_id`."
 
-### On registration
+> **Important:** The value passed to `identify` must be the same user ID used across all devices and platforms. For Bild, this is the CSUID. Do not use email addresses — they can change and will break cross-device identity.
+
+**For mid-session identity (returning logged-in users):**
+
+If a user is already logged in when they arrive on the page, `identify()` must fire before any events. In Tealium, add an extension that checks for a stored user ID and calls `identify()` on page load:
 
 ```javascript
-function onRegistrationSuccess(userId, email) {
-    mixpanel.identify(userId);           // link anonymous history to this user — always first
-    localStorage.setItem('bild_user_id', userId);
-    mixpanel.people.set({                // set user profile attributes
-        '$email':            email,
-        'subscription_status': 'free',
-        '$created':          new Date().toISOString()
-    });
-    mixpanel.track('registration_completed', {
-        'utm_source':   getUTMParam('utm_source'),
-        'utm_medium':   getUTMParam('utm_medium'),
-        'utm_campaign': getUTMParam('utm_campaign')
-    });
+// Tealium extension — fires on page load
+var storedUserId = localStorage.getItem('bild_user_id');
+if (storedUserId) {
+    mixpanel.identify(storedUserId);
 }
 ```
 
-### On login
+**On logout:**
 
 ```javascript
-function onLoginSuccess(userId, subscriptionStatus) {
-    mixpanel.identify(userId);
-    localStorage.setItem('bild_user_id', userId);
-    mixpanel.people.set({ 'subscription_status': subscriptionStatus });
-    mixpanel.track('login_completed');
-}
+// Fires when tealium_event = 'logout'
+// Track the event first, then reset
+mixpanel.track('logout_completed');
+localStorage.removeItem('bild_user_id');
+mixpanel.reset(); // clears identity and localStorage, generates new anonymous ID
 ```
 
-### On logout
-
-```javascript
-function onLogoutSuccess() {
-    mixpanel.track('logout_completed');            // track first
-    localStorage.removeItem('bild_user_id');
-    mixpanel.reset();                              // reset last — generates new anonymous ID
-}
-```
-
-**The rules:**
-- `identify()` always fires **before** `track()` for authentication events
-- `reset()` always fires **after** `track()` on logout
-- `reset()` is only ever called on explicit user-initiated logout — never on page unload or session timeout
+> `reset()` must only be called on explicit user logout — never on page unload, session timeout, or app update.
 
 ---
 
@@ -524,20 +496,21 @@ if (mixpanel.has_opted_in_tracking()) {
 
 | Topic | Link |
 |---|---|
+| **Tealium integration (primary reference)** | https://docs.mixpanel.com/docs/tracking-methods/integrations/tealium |
 | JavaScript SDK | https://docs.mixpanel.com/docs/tracking-methods/sdks/javascript |
 | JavaScript quickstart | https://docs.mixpanel.com/docs/tracking/javascript-quickstart |
 | Privacy-friendly tracking & opt-in/out | https://docs.mixpanel.com/docs/tracking-methods/sdks/javascript#privacy-friendly-tracking |
 | GDPR compliance | https://docs.mixpanel.com/docs/privacy/gdpr-compliance |
 | EU data residency | https://docs.mixpanel.com/docs/privacy/eu-residency |
-| Identifying users | https://docs.mixpanel.com/docs/tracking-methods/id-management/identifying-users-simplified |
+| Identifying users (Simplified ID Merge) | https://docs.mixpanel.com/docs/tracking-methods/id-management/identifying-users-simplified |
 | User profiles | https://docs.mixpanel.com/docs/data-structure/user-profiles |
 | Super properties | https://docs.mixpanel.com/docs/tracking-methods/sdks/javascript#super-properties |
 | Traffic attribution and UTMs | https://docs.mixpanel.com/docs/tracking-best-practices/traffic-attribution |
 | Funnels | https://docs.mixpanel.com/docs/reports/funnels |
 | Flows | https://docs.mixpanel.com/docs/reports/flows |
-| Tealium integration | https://docs.mixpanel.com/docs/tracking-methods/integrations/tealium |
 
 ---
 
 *Maintained by Max Taylor, Solutions Engineering — Mixpanel*
 *Last updated: June 2026*
+
