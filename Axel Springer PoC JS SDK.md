@@ -41,12 +41,91 @@ Run this once when the SDK loads. It sets up the Mixpanel instance before any tr
 ```javascript
 mixpanel.init('<your_project_token>', {
     debug: false,
-    persistence: 'localStorage',  // avoids cookie consent complications
-    track_pageview: false          // we track page views manually for full control
+    persistence: 'localStorage',          // avoids cookie consent complications
+    track_pageview: false,                 // we track page views manually for full control
+    opt_out_tracking_by_default: true,     // GDPR: all users start opted out
+    api_host: 'https://api-eu.mixpanel.com', // EU data residency — required for this project
+    stop_utm_persistence: false            // keep UTMs as super properties (see UTM section)
 });
 ```
 
+> **Important — EU data residency:** The Bild project uses EU data residency. The `api_host` must always be set to `https://api-eu.mixpanel.com` or events will be routed to the US servers and will not be ingested into this project.
+
+> **Important — opt out by default:** With `opt_out_tracking_by_default: true`, the SDK initialises with tracking disabled for all users. No events will be sent until `mixpanel.opt_in_tracking()` is called. This means the consent flow below must be in place before any tracking fires.
+
 Immediately after init, capture and register UTMs (see [UTM section](#utm-and-campaign-attribution)) and check for a logged-in user (see [Identity management](#identity-management)) before any `track()` calls.
+
+---
+
+## Privacy and consent management
+
+Because `opt_out_tracking_by_default: true` is set at init, no events will fire until the user has explicitly consented. This is the correct pattern for GDPR compliance on bild.de.
+
+### Opt in when consent is given
+
+Call this immediately when the user accepts analytics tracking in your CMP (OneTrust, Cookiebot, or equivalent):
+
+```javascript
+// Call when user accepts analytics in consent banner
+function onConsentAccepted() {
+    mixpanel.opt_in_tracking();
+    // Now run the full initialisation sequence
+    captureUTMs();
+    mixpanel.register({
+        'utm_source':   getUTMParam('utm_source'),
+        'utm_medium':   getUTMParam('utm_medium'),
+        'utm_campaign': getUTMParam('utm_campaign'),
+    });
+    initMixpanelIdentity();
+    mixpanel.track('page_viewed', {
+        'page_url':   window.location.pathname,
+        'page_type':  getPageType()
+    });
+}
+```
+
+### Opt out when consent is withdrawn
+
+Call this if the user withdraws consent via your CMP:
+
+```javascript
+// Call when user revokes analytics consent
+function onConsentRevoked() {
+    mixpanel.opt_out_tracking();
+    // SDK immediately stops sending any data
+    // Stored localStorage data is cleared
+}
+```
+
+### Check consent status
+
+Use this to check whether the user has already consented — useful for returning visitors:
+
+```javascript
+// Returns true if user has opted in
+if (mixpanel.has_opted_in_tracking()) {
+    // user has previously consented — proceed with tracking
+    initMixpanelIdentity();
+}
+
+// Returns true if user has opted out
+if (mixpanel.has_opted_out_tracking()) {
+    // user has declined — do not track
+}
+```
+
+### Returning visitor — consent already stored
+
+For users who consented on a previous visit, their opt-in status is stored in localStorage. The SDK will read this automatically on init. You still need to call `opt_in_tracking()` via your CMP's callback if the stored preference isn't being read — or check `has_opted_in_tracking()` on page load and act accordingly.
+
+```javascript
+// On page load — check stored consent before running full init
+if (mixpanel.has_opted_in_tracking()) {
+    onConsentAccepted(); // run full init for returning consented user
+}
+```
+
+> **Note on localStorage vs cookies:** With `persistence: 'localStorage'`, Mixpanel stores its device ID and opt-in/out status in localStorage rather than cookies. This means the consent state persists across sessions without requiring a cookie. Most CMP implementations target cookies specifically and will not block localStorage, but confirm with your legal team whether your CMP should also gate localStorage access under your specific privacy policy.
 
 ---
 
@@ -323,9 +402,25 @@ mixpanel.people.increment('affiliate_clicks_total', 1);
 
 ## UTM and campaign attribution
 
-UTMs arrive on web via URL query parameters. Capture them on every page load and store in localStorage so they persist across the session and are available for all subsequent events.
+> **The SDK handles UTMs automatically.** The Mixpanel JS SDK reads UTM parameters from the page URL and attaches them to all events fired from that page load — including `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content` and advertising click IDs (`gclid`, `fbclid` etc). You do not need to read them manually from the URL.
 
-### Capture UTMs on page load
+The first time UTMs are seen for an identified user, the SDK also stores them on the user profile as `initial_utm_source`, `initial_utm_campaign` etc — permanent first-touch attribution, set once and never overwritten.
+
+### Recommended init config for UTMs
+
+```javascript
+mixpanel.init('<project_token>', {
+    stop_utm_persistence: true    // recommended — UTMs are read fresh on each page load
+                                  // not carried forward as super properties
+                                  // more accurate for last-touch attribution models
+});
+```
+
+With `stop_utm_persistence: false` (default), UTMs from the landing page persist as super properties and attach to every subsequent event in the session, even on pages with no UTM parameters in the URL. Use `true` if you want each event to carry only the UTMs from that specific page load.
+
+### Manual localStorage approach (optional)
+
+Only needed if you want UTMs available in Tealium's data layer before the SDK fires, or want explicit first-touch vs last-touch logic:
 
 ```javascript
 function captureUTMs() {
@@ -341,7 +436,7 @@ function captureUTMs() {
         }
     });
 
-    // Optionally store first-touch UTMs separately (never overwrite)
+    // Store first-touch UTMs separately — never overwrite
     if (hasNewUTMs && !localStorage.getItem('first_utm_source')) {
         utmKeys.forEach(key => {
             const value = params.get(key);
@@ -350,73 +445,47 @@ function captureUTMs() {
     }
 }
 
-captureUTMs(); // call on every page load
-```
-
-### Helper function — retrieve stored UTMs
-
-```javascript
 function getUTMParam(key) {
     return localStorage.getItem(key) || '';
 }
 ```
 
-Always pass empty strings rather than omitting UTM properties — missing properties are excluded from breakdowns entirely, whereas empty strings appear as `(none)` which is more useful for filtering.
+Always send empty strings rather than omitting UTM properties — missing properties are excluded from breakdowns entirely, whereas empty strings appear as `(none)` which is more useful for filtering.
 
-### Register UTMs as super properties
+### Full initialisation sequence (with consent gate)
 
-Super properties attach automatically to every event. Register UTMs as super properties so you never have to remember to add them manually.
-
-```javascript
-mixpanel.register({
-    'utm_source':   getUTMParam('utm_source'),
-    'utm_medium':   getUTMParam('utm_medium'),
-    'utm_campaign': getUTMParam('utm_campaign'),
-    'utm_content':  getUTMParam('utm_content'),
-    'utm_term':     getUTMParam('utm_term')
-});
-```
-
-Call this immediately after `captureUTMs()` on every page load.
-
-### Full initialisation sequence
-
-This is the correct order of operations on every page load:
+This is the correct order of operations. Note that steps 2–6 only run after consent is granted — they live inside `onConsentAccepted()`:
 
 ```javascript
-// 1. Init SDK
-mixpanel.init('<project_token>', { persistence: 'localStorage', track_pageview: false });
-
-// 2. Capture UTMs from URL
-captureUTMs();
-
-// 3. Register UTMs as super properties
-mixpanel.register({
-    'utm_source':   getUTMParam('utm_source'),
-    'utm_medium':   getUTMParam('utm_medium'),
-    'utm_campaign': getUTMParam('utm_campaign'),
-    'utm_content':  getUTMParam('utm_content'),
-    'utm_term':     getUTMParam('utm_term')
+// Step 1 — Init SDK (runs on every page load, tracking disabled until consent)
+mixpanel.init('<project_token>', {
+    persistence: 'localStorage',
+    track_pageview: false,
+    opt_out_tracking_by_default: true,
+    api_host: 'https://api-eu.mixpanel.com',
+    stop_utm_persistence: true
 });
 
-// 4. Identify logged-in users
-initMixpanelIdentity();
+// Step 2–6 — run only after user consents
+function onConsentAccepted() {
+    mixpanel.opt_in_tracking();      // 2. enable tracking
+    captureUTMs();                    // 3. capture UTMs from URL (optional manual capture)
+    initMixpanelIdentity();           // 4. identify logged-in user if applicable
+    mixpanel.track('page_viewed', {   // 5. track page view
+        'page_url':   window.location.pathname,
+        'page_title': document.title,
+        'page_type':  getPageType(),
+        'referrer':   document.referrer
+    });
+    attachAffiliateListeners();       // 6. attach event listeners
+    attachButtonListeners();
+    attachProductObservers();
+}
 
-// 5. Track page view
-mixpanel.track('page_viewed', {
-    'page_url':   window.location.pathname,
-    'page_title': document.title,
-    'page_type':  getPageType(),
-    'referrer':   document.referrer,
-    'utm_source': getUTMParam('utm_source'),
-    'utm_medium': getUTMParam('utm_medium'),
-    'utm_campaign': getUTMParam('utm_campaign')
-});
-
-// 6. Attach event listeners
-attachAffiliateListeners();
-attachButtonListeners();
-attachProductObservers();
+// For returning users who already consented
+if (mixpanel.has_opted_in_tracking()) {
+    onConsentAccepted();
+}
 ```
 
 ---
@@ -457,6 +526,9 @@ attachProductObservers();
 |---|---|
 | JavaScript SDK | https://docs.mixpanel.com/docs/tracking-methods/sdks/javascript |
 | JavaScript quickstart | https://docs.mixpanel.com/docs/tracking/javascript-quickstart |
+| Privacy-friendly tracking & opt-in/out | https://docs.mixpanel.com/docs/tracking-methods/sdks/javascript#privacy-friendly-tracking |
+| GDPR compliance | https://docs.mixpanel.com/docs/privacy/gdpr-compliance |
+| EU data residency | https://docs.mixpanel.com/docs/privacy/eu-residency |
 | Identifying users | https://docs.mixpanel.com/docs/tracking-methods/id-management/identifying-users-simplified |
 | User profiles | https://docs.mixpanel.com/docs/data-structure/user-profiles |
 | Super properties | https://docs.mixpanel.com/docs/tracking-methods/sdks/javascript#super-properties |
